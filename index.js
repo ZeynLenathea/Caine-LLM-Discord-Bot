@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Events } = require("discord.js");
+const { Client, GatewayIntentBits, Events, ActivityType } = require("discord.js");
 const Groq = require("groq-sdk");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fetch = require("node-fetch");
@@ -95,7 +95,7 @@ client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot online: ${c.user.tag}`);
   c.user.setPresence({
     activities: [{ 
-      name: "customstatus", 
+      name: "custom", 
       type: ActivityType.Custom, 
       state: "Property Of Caineedyou | Developed By Zaineedyou" 
 });
