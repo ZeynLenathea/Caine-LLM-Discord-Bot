@@ -100,8 +100,11 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   const content = message.content.trim();
   const isMentioned = message.mentions.has(client.user);
-  const hasPrefix = content.toLowerCase().startsWith(BOT_PREFIX.toLowerCase());
-  if (!hasPrefix && !isMentioned) return;
+  const hasPrefix = content.toLowerCase().includes(BOT_PREFIX.toLowerCase());
+  const isReply = message.reference && 
+  (await message.fetchReference()).author.id === client.user.id;
+
+if (!hasPrefix && !isMentioned && !isReply) return;
 
   let userText = content;
   if (hasPrefix) userText = content.slice(BOT_PREFIX.length).trim();
