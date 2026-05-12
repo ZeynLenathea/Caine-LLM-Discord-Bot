@@ -92,12 +92,14 @@ function splitMessage(text, maxLength = 1900) {
 }
 
 client.once(Events.ClientReady, (c) => {
-  console.log(`✅ Bot online: ${c.user.tag}`);
+  console.log(`✅ Bot online sebagai ${c.user.tag}`);
   c.user.setPresence({
     activities: [{ 
       name: "custom", 
       type: ActivityType.Custom, 
       state: "Property Of Caineedyou | Developed By Zaineedyou" 
+    }],
+  });
 });
 
 client.on(Events.MessageCreate, async (message) => {
