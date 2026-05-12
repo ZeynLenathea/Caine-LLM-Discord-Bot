@@ -7,7 +7,7 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const BOT_PREFIX = process.env.BOT_PREFIX || "!ai";
-const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Lo adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama temen. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
+const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -93,7 +93,11 @@ function splitMessage(text, maxLength = 1900) {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot online: ${c.user.tag}`);
-  c.user.setActivity("Groq + Gemini 🤖");
+  c.user.setPresence({
+    activities: [{ 
+      name: "customstatus", 
+      type: ActivityType.Custom, 
+      state: "Property Of Caineedyou | Developed By Zaineedyou" 
 });
 
 client.on(Events.MessageCreate, async (message) => {
@@ -112,7 +116,7 @@ if (!hasPrefix && !isMentioned && !isReply) return;
 
   if (userText.toLowerCase() === "reset" || userText.toLowerCase() === "clear") {
     clearHistory(message.author.id);
-    return message.reply("🧹 Memory lo udah di-reset!");
+    return message.reply("🧹 Memory Kamu udah di-reset!");
   }
 
   if (userText.toLowerCase() === "help") {
@@ -137,7 +141,7 @@ if (!hasPrefix && !isMentioned && !isReply) return;
       reply = await askGemini(message.author.id, userText, imageAttachment.url);
       reply = `🖼️ *[Gemini Vision]*\n\n${reply}`;
     } else {
-      if (!userText) return message.reply("Mau nanya apa? 😄");
+      if (!userText) return message.reply("Iya? kenapa, Sayang?");
       reply = await askGroq(message.author.id, userText);
     }
     const chunks = splitMessage(reply);
@@ -151,7 +155,7 @@ if (!hasPrefix && !isMentioned && !isReply) return;
       const chunks = splitMessage(`⚡ *[Gemini Fallback]*\n\n${fallback}`);
       for (const chunk of chunks) await message.reply(chunk);
     } catch {
-      message.reply("❌ Ada error bro, coba lagi ya.");
+      message.reply("❌ Ada error Sayang, coba lagi ya.");
     }
   }
 });
