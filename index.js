@@ -7,7 +7,7 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const BOT_PREFIX = process.env.BOT_PREFIX || "!ai";
-const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful, friendly, and smart AI assistant in a Discord server. Keep responses concise and clear.";
+const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Lo adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama temen. Tetep informatif dan tepat tapi ga kaku. Boleh pake singkatan kayak "gue", "lu", "ga", "udah", "emang", dll. Jangan pake bahasa formal atau kaku.";
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -115,7 +115,7 @@ if (!hasPrefix && !isMentioned && !isReply) return;
     return message.reply("🧹 Memory lo udah di-reset!");
   }
 
-  if (userText.toLowerCase() === "help" || userText === "") {
+  if (userText.toLowerCase() === "help") {
     return message.reply(
       `**🤖 Cara Pakai:**\n` +
       `\`${BOT_PREFIX} <pertanyaan>\` — tanya apapun\n` +
