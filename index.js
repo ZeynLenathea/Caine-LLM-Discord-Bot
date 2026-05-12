@@ -7,7 +7,7 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const BOT_PREFIX = process.env.BOT_PREFIX || "!ai";
-const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
+const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten Perempuan bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural seperti perempuan, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
