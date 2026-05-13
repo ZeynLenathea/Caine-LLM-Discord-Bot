@@ -138,7 +138,7 @@ async function logAutomod(message, word) {
 async function askGroq(key, userMessage) {
   const history = getHistory(key);
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT + "\n\n" + PERSONA },
+    { role: "system", content: SYSTEM_PROMPT },
     ...history,
     { role: "user", content: userMessage },
   ];
@@ -167,7 +167,7 @@ async function askGemini(key, userMessage, imageUrl) {
   const base64Image = Buffer.from(arrayBuffer).toString("base64");
   const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] || "image/png";
 
-  const prompt = (userMessage || "Deskripsiin gambar ini secara detail.") + "\n\nJawab dengan gaya " + PERSONA;
+  const prompt = (userMessage || "Deskripsiin gambar ini secara detail.") + "\n\nJawab dengan gaya " + SYSTEM_PROMPT;
 
   const result = await model.generateContent([
     { inlineData: { data: base64Image, mimeType } },
