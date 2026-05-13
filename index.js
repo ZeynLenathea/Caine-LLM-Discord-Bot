@@ -155,8 +155,6 @@ async function askGroq(key, userMessage) {
 }
 
 async function askGemini(key, userMessage, imageUrl) {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-
   const imageResponse = await fetch(imageUrl, {
     headers: { "User-Agent": "Mozilla/5.0" }
   });
@@ -167,14 +165,25 @@ async function askGemini(key, userMessage, imageUrl) {
   const base64Image = Buffer.from(arrayBuffer).toString("base64");
   const mimeType = imageResponse.headers.get("content-type")?.split(";")[0] || "image/png";
 
-  const prompt = (userMessage || "Deskripsiin gambar ini secara detail.") + "\n\nJawab dengan gaya " + SYSTEM_PROMPT;
+  const prompt = userMessage || "Deskripsiin gambar ini secara detail.";
 
-  const result = await model.generateContent([
-    { inlineData: { data: base64Image, mimeType } },
-    prompt,
-  ]);
-  const reply = result.response.text();
-  addToHistory(key, "user", `[User kirim gambar] ${userMessage || ""}`);
+  const response = await groq.chat.completions.create({
+    model: "llama-3.2-11b-vision-preview",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+          { type: "text", text: prompt }
+        ]
+      }
+    ],
+    max_tokens: 1024,
+  });
+
+  const reply = response.choices[0].message.content;
+  addToHistory(key, "user", `[User kirim gambar] ${prompt}`);
   addToHistory(key, "assistant", reply);
   return reply;
 }
@@ -577,7 +586,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (imageAttachment) {
       reply = await askGemini(historyKey, userText, imageAttachment.url);
     } else {
-      const prompt = userText || "Halo sayang, kenapa nih manggil aku?";
+      const prompt = userText || "balas dengan gaya kamu sendiri seolah kamu baru dipanggil namamu, seperti 'Halo sayang, kenapa nih manggil aku?'";
       reply = await askGroq(historyKey, prompt);
     }
 
@@ -587,13 +596,6 @@ client.on(Events.MessageCreate, async (message) => {
 
   } catch (err) {
     console.error("Error:", err);
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-      const result = await model.generateContent(userText || "Halo");
-      const fallback = result.response.text();
-      const chunks = splitMessage(fallback);
-      for (const chunk of chunks) await message.reply(chunk);
-    } catch {
       message.reply("❌ Ada error sayang, coba lagi ya 🙏");
     }
   }
