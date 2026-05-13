@@ -586,7 +586,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (imageAttachment) {
       reply = await askGemini(historyKey, userText, imageAttachment.url);
     } else {
-      const prompt = userText || "balas dengan gaya kamu sendiri seolah kamu baru dipanggil namamu, seperti 'Halo sayang, kenapa nih manggil aku?'";
+      const prompt = userText || "Seseorang baru manggil namamu. Balas dengan 'Halo sayang!' atau sapaan mesra lainnya, jangan pakai kata 'bro'.";
       reply = await askGroq(historyKey, prompt);
     }
 
