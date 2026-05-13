@@ -155,7 +155,7 @@ async function askGroq(key, userMessage) {
 }
 
 async function askGemini(key, userMessage, imageUrl) {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
   const imageResponse = await fetch(imageUrl, {
     headers: { "User-Agent": "Mozilla/5.0" }
@@ -577,7 +577,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (imageAttachment) {
       reply = await askGemini(historyKey, userText, imageAttachment.url);
     } else {
-      const prompt = userText || "Halo, ada yang manggil aku nih";
+      const prompt = userText || "Halo sayang, kenapa nih manggil aku?";
       reply = await askGroq(historyKey, prompt);
     }
 
@@ -588,7 +588,7 @@ client.on(Events.MessageCreate, async (message) => {
   } catch (err) {
     console.error("Error:", err);
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
       const result = await model.generateContent(userText || "Halo");
       const fallback = result.response.text();
       const chunks = splitMessage(fallback);
