@@ -596,10 +596,8 @@ client.on(Events.MessageCreate, async (message) => {
 
   } catch (err) {
     console.error("Error:", err);
-      message.reply("❌ Ada error sayang, coba lagi ya 🙏");
-    }
+    message.reply("❌ Ada error sayang, coba lagi ya 🙏");
   }
 });
 
 client.login(DISCORD_TOKEN);
-     
