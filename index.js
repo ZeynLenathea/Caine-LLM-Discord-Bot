@@ -71,16 +71,20 @@ async function logAutomod(message, word) {
   ).setTimestamp());
 }
 
-async function askGroq(key, userMessage) {
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...getHistory(key), { role: "user", content: userMessage }];
+async function askGroq(key, userMessage, displayName = "User") {
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...getHistory(key),
+    { role: "user", content: `[${displayName}]: ${userMessage}` },
+  ];
   const res = await groq.chat.completions.create({ model: "llama-3.3-70b-versatile", messages, max_tokens: 1024, temperature: 0.8 });
   const reply = res.choices[0].message.content;
-  addToHistory(key, "user", userMessage);
+  addToHistory(key, "user", `[${displayName}]: ${userMessage}`);
   addToHistory(key, "assistant", reply);
   return reply;
 }
 
-async function askVision(key, userMessage, imageUrl) {
+async function askVision(key, userMessage, imageUrl, displayName = "User") {
   const imgRes = await fetch(imageUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
   if (!imgRes.ok) throw new Error(`Gagal fetch gambar: ${imgRes.status}`);
   const base64Image = Buffer.from(await imgRes.arrayBuffer()).toString("base64");
@@ -88,11 +92,20 @@ async function askVision(key, userMessage, imageUrl) {
   const prompt = userMessage || "Deskripsiin gambar ini secara detail.";
   const res = await groq.chat.completions.create({
     model: "meta-llama/llama-4-scout-17b-16e-instruct",
-    messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: [{ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }, { type: "text", text: prompt }] }],
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+          { type: "text", text: `[${displayName}]: ${prompt}` }
+        ]
+      }
+    ],
     max_tokens: 1024,
   });
   const reply = res.choices[0].message.content;
-  addToHistory(key, "user", `[User kirim gambar] ${prompt}`);
+  addToHistory(key, "user", `[${displayName}]: [kirim gambar] ${prompt}`);
   addToHistory(key, "assistant", reply);
   return reply;
 }
@@ -230,7 +243,7 @@ async function handleModeration(message, userText) {
   if (cmd === "removeword") {
     if (!userHasPerm(message, PermissionsBitField.Flags.Administrator)) return message.reply("❌ Khusus admin aja sayang."), true;
     bannedWords.delete(args[1]?.toLowerCase());
-    return message.reply(`✅ Kata dihapus dari blacklist.`), true;
+    return message.reply("✅ Kata dihapus dari blacklist."), true;
   }
   if (cmd === "words") {
     if (!userHasPerm(message, PermissionsBitField.Flags.Administrator)) return message.reply("❌ Khusus admin aja sayang."), true;
@@ -252,9 +265,9 @@ async function handleModeration(message, userText) {
 
 async function summarizeChannel(message, amount = 30) {
   const msgs = await message.channel.messages.fetch({ limit: Math.min(amount, 100) });
-  const text = msgs.reverse().map(m => `${m.author.username}: ${m.content}`).filter(t => t.length > 10).join("\n");
+  const text = msgs.reverse().map(m => `${m.author.displayName}: ${m.content}`).filter(t => t.length > 10).join("\n");
   if (!text) return message.reply("❌ Ga ada pesan yang bisa dirangkum sayang.");
-  const result = await askGroq(getHistoryKey(message), `Rangkum percakapan berikut dalam beberapa poin penting, pake bahasa Indonesia yang santai:\n\n${text.slice(0, 3000)}`);
+  const result = await askGroq(getHistoryKey(message), `Rangkum percakapan berikut dalam beberapa poin penting, pake bahasa Indonesia yang santai:\n\n${text.slice(0, 3000)}`, "System");
   return message.reply(`📝 **Rangkuman:**\n\n${result}`);
 }
 
@@ -289,6 +302,7 @@ client.on(Events.MessageCreate, async (message) => {
   else if (isMentioned) { userText = content.replace(`<@${client.user.id}>`, "").trim(); }
 
   const historyKey = getHistoryKey(message);
+  const displayName = message.member?.displayName || message.author.displayName || message.author.username;
 
   if (userText.toLowerCase() === "reset" || userText.toLowerCase() === "clear") { clearHistory(historyKey); return message.reply("🧹 Memory kita udah di-reset sayang!"); }
   if (userText.toLowerCase().startsWith("summarize")) { return summarizeChannel(message, parseInt(userText.split(" ")[1]) || 30); }
@@ -314,9 +328,9 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     let reply;
     if (imageAttachment) {
-      reply = await askVision(historyKey, userText, imageAttachment.url);
+      reply = await askVision(historyKey, userText, imageAttachment.url, displayName);
     } else {
-      reply = await askGroq(historyKey, userText || "Seseorang baru manggil namamu. Balas dengan sapaan mesra seperti pacar, jangan pakai kata bro.");
+      reply = await askGroq(historyKey, userText || "Seseorang baru manggil namamu. Balas dengan sapaan mesra seperti pacar, jangan pakai kata bro.", displayName);
     }
     const chunks = splitMessage(reply);
     for (const chunk of chunks) await message.reply(chunk);
