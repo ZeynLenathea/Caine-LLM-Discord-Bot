@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_PREFIX = process.env.BOT_PREFIX || "Caine";
-const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
+const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten perempuan bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
 const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID || "1503911709897785464";
 const CLIENT_ID = "1503728763416875118";
 
@@ -97,7 +97,6 @@ async function logAutomod(message, word) {
 async function askGroq(key, userMessage, displayName = "User") {
   const history = getHistory(key);
 
-  // Inject nama user di setiap pesan history biar bot tau siapa ngomong apa
   const messages = [
     {
       role: "system",
@@ -107,40 +106,19 @@ async function askGroq(key, userMessage, displayName = "User") {
     { role: "user", content: `[${displayName}]: ${userMessage}` },
   ];
 
-  const res = await groq.chat.completions.create({
-    model: "openai/gpt-oss-120b",
-    messages,
-    max_tokens: 1024,
-    temperature: 0.8,
-    tools: [{ type: "browser_search" }],
-    tool_choice: "auto",
-  });
-
-  // Handle tool use response
-  let reply = "";
-  const choice = res.choices[0];
-
-  if (choice.finish_reason === "tool_calls" || choice.message.tool_calls) {
-    // Model minta search, jalankan dan kirim hasilnya kembali
-    const toolMessages = [...messages, choice.message];
-    for (const toolCall of choice.message.tool_calls) {
-      toolMessages.push({
-        role: "tool",
-        tool_call_id: toolCall.id,
-        content: "Search executed"
-      });
-    }
-    const finalRes = await groq.chat.completions.create({
+  const res = await Promise.race([
+    groq.chat.completions.create({
       model: "openai/gpt-oss-120b",
-      messages: toolMessages,
+      messages,
       max_tokens: 1024,
       temperature: 0.8,
-    });
-    reply = finalRes.choices[0].message.content;
-  } else {
-    reply = choice.message.content;
-  }
+      tools: [{ type: "browser_search" }],
+      tool_choice: "auto",
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 20000))
+  ]);
 
+  const reply = res.choices[0].message.content;
   addToHistory(key, "user", `[${displayName}]: ${userMessage}`);
   addToHistory(key, "assistant", reply);
   return reply;
@@ -374,7 +352,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "📡 Status", value: "🟢 Online", inline: true },
         { name: "🏠 Server", value: interaction.guild?.name || "User Install", inline: true },
       )
-      .setFooter({ text: "Developed with ❤️ by Zaineedyou" })
+      .setFooter({ text: "Property Of Caineedyou | Developed by Zaineedyou" })
       .setTimestamp();
     await interaction.reply({ embeds: [embed] });
   }
