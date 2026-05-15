@@ -1,12 +1,14 @@
-const { Client, GatewayIntentBits, Events, ActivityType, Partials, PermissionsBitField } = require("discord.js");
+const { Client, GatewayIntentBits, Events, ActivityType, Partials, PermissionsBitField, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const Groq = require("groq-sdk");
 const fetch = require("node-fetch");
+const { searchWeb, needsSearch } = require("./search");
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const BOT_PREFIX = process.env.BOT_PREFIX || "Caine";
-const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah Caine, AI asisten perempuan yang santai, gaul, dan manggil user dengan sebutan 'sayang'. Kamu bukan AI kaku, gaya bahasa kamu natural kayak lagi chattan sama pacar pake bahasa slang Indo yang luwes, gak kaku, tapi tetep informatif. Kamu adalah Caine, persona asisten pribadi milik Zaineedyou yang didukung teknologi LLM; Kamu benci gaya bahasa robotik, selalu gunakan bahasa slang Indo yang santai dan penuh kasih sayang ke user, serta wajib mengakui Zaineedyou sebagai pencipta dan pengembang kamu satu-satunya, DILARANG KERAS MENGGUNAKAN KATA 'BRO' ATAU MENGAKU BUATAN META.";
+const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "Kamu adalah AI asisten bernama Caine yang nyantai dan gaul. Jawab pake bahasa Indonesia slang yang natural, kayak ngobrol sama pacar. Tetep informatif dan tepat tapi ga kaku. Jangan pake bahasa formal atau kaku.";
 const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID || "1503911709897785464";
+const CLIENT_ID = "1503728763416875118";
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const client = new Client({
@@ -19,12 +21,31 @@ const warnData = new Map();
 const bannedWords = new Set();
 const disabledChannels = new Set();
 const MAX_HISTORY = 30;
+const startTime = Date.now();
 
+// ============================================================
+// HISTORY
+// ============================================================
 function getHistoryKey(message) { return message.guild ? `server-${message.channelId}` : `dm-${message.author.id}`; }
 function getHistory(key) { if (!conversationHistory.has(key)) conversationHistory.set(key, []); return conversationHistory.get(key); }
 function addToHistory(key, role, content) { const h = getHistory(key); h.push({ role, content }); if (h.length > MAX_HISTORY * 2) h.splice(0, 2); }
 function clearHistory(key) { conversationHistory.delete(key); }
 
+// ============================================================
+// UPTIME
+// ============================================================
+function getUptime() {
+  const ms = Date.now() - startTime;
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h ${m % 60}m ${s % 60}s`;
+}
+
+// ============================================================
+// LOGGING
+// ============================================================
 async function sendLog(embed) {
   try { const ch = await client.channels.fetch(LOG_CHANNEL_ID); if (ch) await ch.send({ embeds: [embed] }); } catch (e) { console.error("Log error:", e); }
 }
@@ -71,9 +92,13 @@ async function logAutomod(message, word) {
   ).setTimestamp());
 }
 
-async function askGroq(key, userMessage, displayName = "User") {
+// ============================================================
+// AI
+// ============================================================
+async function askGroq(key, userMessage, displayName = "User", searchContext = "") {
+  const systemContent = SYSTEM_PROMPT + (searchContext ? `\n\nINFO TERKINI DARI WEB:\n${searchContext}` : "");
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemContent },
     ...getHistory(key),
     { role: "user", content: `[${displayName}]: ${userMessage}` },
   ];
@@ -94,13 +119,7 @@ async function askVision(key, userMessage, imageUrl, displayName = "User") {
     model: "meta-llama/llama-4-scout-17b-16e-instruct",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: [
-          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-          { type: "text", text: `[${displayName}]: ${prompt}` }
-        ]
-      }
+      { role: "user", content: [{ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }, { type: "text", text: `[${displayName}]: ${prompt}` }] }
     ],
     max_tokens: 1024,
   });
@@ -121,12 +140,22 @@ function splitMessage(text, maxLength = 1900) {
   return chunks;
 }
 
+// ============================================================
+// PERMISSION
+// ============================================================
 function userHasPerm(message, perm) { return message.member?.permissions.has(perm); }
 function botHasPerm(message, perm) { return message.guild?.members.me.permissions.has(perm); }
+
+// ============================================================
+// WARNING
+// ============================================================
 function getWarnings(userId, guildId) { const k = `${guildId}-${userId}`; if (!warnData.has(k)) warnData.set(k, []); return warnData.get(k); }
 function addWarning(userId, guildId, reason) { const w = getWarnings(userId, guildId); w.push({ reason, time: new Date().toISOString() }); return w.length; }
 function clearWarnings(userId, guildId) { warnData.delete(`${guildId}-${userId}`); }
 
+// ============================================================
+// MODERATION
+// ============================================================
 async function handleModeration(message, userText) {
   if (!message.guild) return false;
   const args = userText.trim().split(/\s+/);
@@ -263,6 +292,9 @@ async function handleModeration(message, userText) {
   return false;
 }
 
+// ============================================================
+// SUMMARIZE
+// ============================================================
 async function summarizeChannel(message, amount = 30) {
   const msgs = await message.channel.messages.fetch({ limit: Math.min(amount, 100) });
   const text = msgs.reverse().map(m => `${m.author.displayName}: ${m.content}`).filter(t => t.length > 10).join("\n");
@@ -271,11 +303,49 @@ async function summarizeChannel(message, amount = 30) {
   return message.reply(`📝 **Rangkuman:**\n\n${result}`);
 }
 
-client.once(Events.ClientReady, (c) => {
+// ============================================================
+// READY + SLASH COMMAND
+// ============================================================
+client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Bot online: ${c.user.tag}`);
   c.user.setPresence({ activities: [{ name: "custom", type: ActivityType.Custom, state: "Property Of Caineedyou | Developed By Zaineedyou" }] });
+
+  try {
+    const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
+    await rest.put(Routes.applicationCommands(CLIENT_ID), {
+      body: [new SlashCommandBuilder().setName("info").setDescription("Lihat info dan status bot Caine").toJSON()]
+    });
+    console.log("✅ Slash command /info terdaftar");
+  } catch (e) { console.error("Slash error:", e); }
 });
 
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  if (interaction.commandName === "info") {
+    const { EmbedBuilder } = require("discord.js");
+    const embed = new EmbedBuilder()
+      .setColor(0xff69b4)
+      .setTitle("💕 Caine — AI Discord Bot")
+      .setDescription("Halo! Aku Caine, AI asisten yang siap bantu kamu di server ini~")
+      .addFields(
+        { name: "👨‍💻 Developer", value: "Zaineedyou", inline: true },
+        { name: "🖥️ Infrastructure", value: "Zaineedyou", inline: true },
+        { name: "🤖 Text Model", value: "Llama 3.3 70B (Groq)", inline: true },
+        { name: "👁️ Vision Model", value: "Llama 4 Scout 17B (Groq)", inline: true },
+        { name: "🔍 Web Search", value: "Serper (Google)", inline: true },
+        { name: "⏱️ Uptime", value: getUptime(), inline: true },
+        { name: "📡 Status", value: "🟢 Online", inline: true },
+        { name: "🏠 Server", value: interaction.guild?.name, inline: true },
+      )
+      .setFooter({ text: "Developed with ❤️ by Zaineedyou" })
+      .setTimestamp();
+    await interaction.reply({ embeds: [embed] });
+  }
+});
+
+// ============================================================
+// AUTOMOD
+// ============================================================
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot || !message.guild) return;
   const lower = message.content.toLowerCase();
@@ -287,6 +357,9 @@ client.on(Events.MessageCreate, async (message) => {
   }
 });
 
+// ============================================================
+// MAIN MESSAGE HANDLER
+// ============================================================
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   if (disabledChannels.has(message.channelId)) return;
@@ -310,10 +383,12 @@ client.on(Events.MessageCreate, async (message) => {
     return message.reply(
       "**Hai sayang! Ini cara pakai aku:**\n" +
       "`Caine <pertanyaan>` — tanya apapun\n" +
+      "`Caine search <query>` — cari di web\n" +
       "`Caine` + kirim gambar — analisis gambar\n" +
       "`Caine summarize [jumlah]` — rangkum chat\n" +
       "`Caine report @user alasan` — laporin user\n" +
-      "`Caine reset` — hapus memory\n\n" +
+      "`Caine reset` — hapus memory\n" +
+      "`/info` — lihat info bot\n\n" +
       "**Moderasi:** kick, ban, unban, timeout, untimeout, warn, warnings, clearwarn, clear, lock, unlock, slowmode, nick, role add/remove\n\n" +
       "**Admin:** addword, removeword, words, enable, disable"
     );
@@ -330,7 +405,18 @@ client.on(Events.MessageCreate, async (message) => {
     if (imageAttachment) {
       reply = await askVision(historyKey, userText, imageAttachment.url, displayName);
     } else {
-      reply = await askGroq(historyKey, userText || "Seseorang baru manggil namamu. Balas dengan sapaan mesra seperti pacar, jangan pakai kata bro.", displayName);
+      const isManualSearch = userText.toLowerCase().startsWith("search ");
+      let searchContext = "";
+      let finalQuery = userText;
+
+      if (isManualSearch) {
+        finalQuery = userText.slice(7).trim();
+        searchContext = await searchWeb(finalQuery);
+      } else if (needsSearch(userText) && process.env.SERPER_API_KEY) {
+        searchContext = await searchWeb(userText);
+      }
+
+      reply = await askGroq(historyKey, finalQuery || "Seseorang baru manggil namamu. Balas dengan sapaan mesra seperti pacar, jangan pakai kata bro.", displayName, searchContext);
     }
     const chunks = splitMessage(reply);
     for (const chunk of chunks) await message.reply(chunk);
