@@ -112,7 +112,7 @@ async function askGroq(key, userMessage, displayName = "User") {
     messages,
     max_tokens: 1024,
     temperature: 0.8,
-    tools: [{ type: "web_search_preview" }],
+    tools: [{ type: "browser_search" }],
     tool_choice: "auto",
   });
 
@@ -372,7 +372,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         { name: "🔍 Web Search", value: "Built-in (GPT OSS)", inline: true },
         { name: "⏱️ Uptime", value: getUptime(), inline: true },
         { name: "📡 Status", value: "🟢 Online", inline: true },
-        { name: "🏠 Server", value: interaction.guild.name, inline: true },
+        { name: "🏠 Server", value: interaction.guild?.name || "User Install", inline: true },
       )
       .setFooter({ text: "Developed with ❤️ by Zaineedyou" })
       .setTimestamp();
